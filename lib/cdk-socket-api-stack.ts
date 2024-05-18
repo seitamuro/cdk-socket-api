@@ -96,6 +96,30 @@ export class CdkSocketApiStack extends cdk.Stack {
       integration: disconnectIntegration,
     });
 
+    // send-message
+    const sendMessageLambda = new lambda.Function(
+      this,
+      "web-socket-send-message",
+      {
+        code: new lambda.AssetCode("lib/lambda"),
+        handler: "send-message.handler",
+        runtime: lambda.Runtime.NODEJS_16_X,
+        environment: {
+          TABLE_NAME: webSocketConnection.tableName,
+          TABLE_KEY: "connectionId",
+        },
+      }
+    );
+    webSocketConnection.grantReadData(sendMessageLambda);
+    api.grantManageConnections(sendMessageLambda);
+    const sendMessageIntegration = new integrations.WebSocketLambdaIntegration(
+      "send-message-lambda-sendMessageIntegration",
+      sendMessageLambda
+    );
+    api.addRoute("send-message", {
+      integration: sendMessageIntegration,
+    });
+
     // deploy apigateway
     const policy = new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
