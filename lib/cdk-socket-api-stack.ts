@@ -53,6 +53,21 @@ export class CdkSocketApiStack extends cdk.Stack {
       },
     });
 
+    const disconnectLambda = new lambda.Function(
+      this,
+      "web-socket-disconnect",
+      {
+        code: new lambda.AssetCode("lib/lambda"),
+        handler: "disconnect.handler",
+        runtime: lambda.Runtime.NODEJS_16_X,
+        environment: {
+          TABLE_NAME: webSocketConnection.tableName,
+          TABLE_KEY: "connectionId",
+        },
+      }
+    );
+    webSocketConnection.grantWriteData(disconnectLambda);
+
     const policy = new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       resources: [connectLambda.functionArn],
@@ -80,6 +95,15 @@ export class CdkSocketApiStack extends cdk.Stack {
     );
     api.addRoute("$default", {
       integration: defaultIntegration,
+    });
+
+    // $disconnect
+    const disconnectIntegration = new integrations.WebSocketLambdaIntegration(
+      "disconnect-lambda-disconnectIntegration",
+      disconnectLambda
+    );
+    api.addRoute("$disconnect", {
+      integration: disconnectIntegration,
     });
 
     // deploy apigateway
