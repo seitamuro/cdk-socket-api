@@ -32,6 +32,7 @@ export class CdkSocketApiStack extends cdk.Stack {
       routeSelectionExpression: "$request.body.action",
     });
 
+    // $connect
     const connectLambda = new lambda.Function(this, "web-socket-connect", {
       code: new lambda.AssetCode("lib/lambda"),
       handler: "connect.handler",
@@ -43,6 +44,15 @@ export class CdkSocketApiStack extends cdk.Stack {
     });
     webSocketConnection.grantWriteData(connectLambda);
 
+    const connectIntegration = new integrations.WebSocketLambdaIntegration(
+      "connect-lambda-connectIntegration",
+      connectLambda
+    );
+    api.addRoute("$connect", {
+      integration: connectIntegration,
+    });
+
+    // $default
     const defaultLambda = new lambda.Function(this, "web-socket-default", {
       code: new lambda.AssetCode("lib/lambda"),
       handler: "default.handler",
@@ -53,6 +63,16 @@ export class CdkSocketApiStack extends cdk.Stack {
       },
     });
 
+    api.grantManageConnections(defaultLambda);
+    const defaultIntegration = new integrations.WebSocketLambdaIntegration(
+      "default-lambda-defaultIntegration",
+      defaultLambda
+    );
+    api.addRoute("$default", {
+      integration: defaultIntegration,
+    });
+
+    // $disconnect
     const disconnectLambda = new lambda.Function(
       this,
       "web-socket-disconnect",
@@ -68,6 +88,15 @@ export class CdkSocketApiStack extends cdk.Stack {
     );
     webSocketConnection.grantWriteData(disconnectLambda);
 
+    const disconnectIntegration = new integrations.WebSocketLambdaIntegration(
+      "disconnect-lambda-disconnectIntegration",
+      disconnectLambda
+    );
+    api.addRoute("$disconnect", {
+      integration: disconnectIntegration,
+    });
+
+    // deploy apigateway
     const policy = new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       resources: [connectLambda.functionArn],
@@ -78,35 +107,6 @@ export class CdkSocketApiStack extends cdk.Stack {
       assumedBy: new iam.ServicePrincipal("apigateway.amazonaws.com"),
     });
 
-    // $connect
-    const connectIntegration = new integrations.WebSocketLambdaIntegration(
-      "connect-lambda-connectIntegration",
-      connectLambda
-    );
-    api.addRoute("$connect", {
-      integration: connectIntegration,
-    });
-
-    // $default
-    api.grantManageConnections(defaultLambda);
-    const defaultIntegration = new integrations.WebSocketLambdaIntegration(
-      "default-lambda-defaultIntegration",
-      defaultLambda
-    );
-    api.addRoute("$default", {
-      integration: defaultIntegration,
-    });
-
-    // $disconnect
-    const disconnectIntegration = new integrations.WebSocketLambdaIntegration(
-      "disconnect-lambda-disconnectIntegration",
-      disconnectLambda
-    );
-    api.addRoute("$disconnect", {
-      integration: disconnectIntegration,
-    });
-
-    // deploy apigateway
     const stage = new apigatewayv2.WebSocketStage(this, "WebSocketProd", {
       webSocketApi: api,
       stageName: "prod",
