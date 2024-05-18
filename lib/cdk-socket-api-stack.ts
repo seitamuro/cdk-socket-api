@@ -43,6 +43,16 @@ export class CdkSocketApiStack extends cdk.Stack {
     });
     webSocketConnection.grantWriteData(connectLambda);
 
+    const defaultLambda = new lambda.Function(this, "web-socket-default", {
+      code: new lambda.AssetCode("lib/lambda"),
+      handler: "default.handler",
+      runtime: lambda.Runtime.NODEJS_16_X,
+      environment: {
+        TABLE_NAME: webSocketConnection.tableName,
+        TABLE_KEY: "connectionId",
+      },
+    });
+
     const policy = new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       resources: [connectLambda.functionArn],
@@ -53,14 +63,26 @@ export class CdkSocketApiStack extends cdk.Stack {
       assumedBy: new iam.ServicePrincipal("apigateway.amazonaws.com"),
     });
 
-    const integration = new integrations.WebSocketLambdaIntegration(
-      "connect-lambda-integration",
+    // $connect
+    const connectIntegration = new integrations.WebSocketLambdaIntegration(
+      "connect-lambda-connectIntegration",
       connectLambda
     );
     api.addRoute("$connect", {
-      integration: integration,
+      integration: connectIntegration,
     });
 
+    // $default
+    api.grantManageConnections(defaultLambda);
+    const defaultIntegration = new integrations.WebSocketLambdaIntegration(
+      "default-lambda-defaultIntegration",
+      defaultLambda
+    );
+    api.addRoute("$default", {
+      integration: defaultIntegration,
+    });
+
+    // deploy apigateway
     const stage = new apigatewayv2.WebSocketStage(this, "WebSocketProd", {
       webSocketApi: api,
       stageName: "prod",
